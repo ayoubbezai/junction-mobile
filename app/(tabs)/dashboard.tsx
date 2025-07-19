@@ -1,82 +1,188 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { statServices } from '../../services/statServices';
 
+const { width, height } = Dimensions.get('window');
 const primary = '#FB3026';
-const cardBg = '#FFF6F5';
-const textMain = '#222';
+const cardBg = '#FFF';
+const textMain = '#1A1A1A';
 const textSecondary = '#666';
-const statusColors: Record<'safe' | 'warning' | 'danger', string> = {
-  safe: '#43B581',
-  warning: '#FFB300',
-  danger: '#FB3026',
-};
 
-const ponds: Array<{ name: string; status: 'safe' | 'warning' | 'danger'; temp: number; ph: number; oxygen: number }> = [
-  { name: 'North Pond', status: 'safe', temp: 23, ph: 7.4, oxygen: 7.2 },
-  { name: 'East Pond', status: 'warning', temp: 29, ph: 6.3, oxygen: 5.8 },
-  { name: 'West Pond', status: 'danger', temp: 33, ph: 5.6, oxygen: 4.1 },
-];
-
-const alerts = [
-  { title: 'Critical Oxygen Drop', message: 'West Pond oxygen level is critically low. Immediate aeration required.' },
-  { title: 'High Temperature', message: 'East Pond temperature is approaching unsafe levels.' },
-];
-
-const tips = [
-  { title: 'Aerate Regularly', message: 'Keep oxygen levels above 6 mg/L for healthy fish.' },
-  { title: 'Monitor pH', message: 'Ideal pH for most fish is between 6.5 and 8.5.' },
-  { title: 'Shade Ponds', message: 'Provide shade to reduce water temperature spikes.' },
-];
+const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function FishtaDashboard() {
+  const [stats, setStats] = useState({
+    ponds_count: 0,
+    regions_count: 0,
+    sensors_count: 0,
+    weekly_ph_do: []
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+      const response = await statServices.getStat();
+      if (response.success) {
+        setStats(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const processChartData = (apiData: any[], dataKey: string) => {
+    if (!apiData || apiData.length === 0) {
+      return weekDays.map(day => ({ date: day, [dataKey]: 0 }));
+    }
+
+    // Create a map of existing data
+    const dataMap = new Map();
+    apiData.forEach(item => {
+      dataMap.set(item.date, parseFloat(item[dataKey]) || 0);
+    });
+
+    // Fill missing days with 0
+    return weekDays.map(day => ({
+      date: day,
+      [dataKey]: dataMap.get(day) || 0
+    }));
+  };
+
+  const renderChart = (data: any[], color: string, title: string, dataKey: string) => {
+    const processedData = processChartData(data, dataKey);
+    const values = processedData.map(item => item[dataKey]);
+    const maxValue = Math.max(...values);
+    const minValue = Math.min(...values);
+    const range = maxValue - minValue || 1;
+    
+    // Get current value (latest non-zero value or 0)
+    const currentValue = processedData.reduce((latest, item) => {
+      return item[dataKey] > 0 ? item[dataKey] : latest;
+    }, 0);
+    
+    return (
+      <View style={styles.chartCard}>
+        <View style={styles.chartHeader}>
+          <View style={styles.chartTitleRow}>
+            <Text style={styles.chartTitle}>{title}</Text>
+            <Text style={[styles.currentValue, { color: color }]}>
+              {currentValue.toFixed(1)}
+            </Text>
+          </View>
+          <View style={styles.timeSelector}>
+            <Text style={styles.timeText}>Weekly</Text>
+            <Ionicons name="chevron-down" size={16} color="#666" />
+          </View>
+        </View>
+        <View style={styles.chartContainer}>
+          <View style={styles.chartWithScale}>
+            {/* Left Scale */}
+            <View style={styles.scaleContainer}>
+              <Text style={styles.scaleValue}>{maxValue.toFixed(1)}</Text>
+              <Text style={styles.scaleValue}>{((maxValue + minValue) / 2).toFixed(1)}</Text>
+              <Text style={styles.scaleValue}>{minValue.toFixed(1)}</Text>
+            </View>
+            
+            {/* Chart Area */}
+            <View style={styles.chartArea}>
+              {processedData.map((item, index) => {
+                const value = item[dataKey];
+                const height = ((value - minValue) / range) * 80;
+                const isActive = item.date === 'Sun'; // Sunday (last day)
+                return (
+                  <View key={index} style={styles.barContainer}>
+                    <View style={[
+                      styles.bar,
+                      {
+                        height: height,
+                        backgroundColor: isActive ? color : `${color}40`,
+                        borderColor: isActive ? color : 'transparent',
+                        borderWidth: isActive ? 2 : 0
+                      }
+                    ]} />
+                    <Text style={[
+                      styles.dayLabel,
+                      { color: isActive ? color : '#666' }
+                    ]}>
+                      {item.date}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.root}>
       {/* Header */}
       <View style={styles.header}>
-        <Image source={require('../../assets/images/fishtaLogo.webp')} style={styles.logo} />
-        <Text style={styles.title}>Fishta</Text>
-      </View>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Pond Status Summary */}
-        <Text style={styles.sectionTitle}>Your Ponds</Text>
-        <View style={styles.pondsRow}>
-          {ponds.map((pond, idx) => (
-            <View key={idx} style={[styles.pondCard, { borderColor: statusColors[pond.status], backgroundColor: cardBg }]}> 
-              <Text style={styles.pondName}>{pond.name}</Text>
-              <View style={styles.statusRow}>
-                <View style={[styles.statusDot, { backgroundColor: statusColors[pond.status] }]} />
-                <Text style={[styles.pondStatus, { color: statusColors[pond.status] }]}>{pond.status.charAt(0).toUpperCase() + pond.status.slice(1)}</Text>
-              </View>
-              <Text style={styles.pondInfo}>Temp: <Text style={{color: textMain}}>{pond.temp}°C</Text></Text>
-              <Text style={styles.pondInfo}>pH: <Text style={{color: textMain}}>{pond.ph}</Text></Text>
-              <Text style={styles.pondInfo}>O₂: <Text style={{color: textMain}}>{pond.oxygen} mg/L</Text></Text>
-              <TouchableOpacity style={styles.detailsBtn}>
-                <Text style={styles.detailsBtnText}>View Details</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
-        {/* Alerts Section */}
-        <Text style={styles.sectionTitle}>Alerts</Text>
-        {alerts.length === 0 ? (
-          <Text style={styles.noAlerts}>No alerts. All ponds are safe!</Text>
-        ) : (
-          alerts.map((alert, idx) => (
-            <View key={idx} style={styles.alertCard}>
-              <Text style={styles.alertTitle}>{alert.title}</Text>
-              <Text style={styles.alertMsg}>{alert.message}</Text>
-            </View>
-          ))
-        )}
-        {/* Tips Section */}
-        <Text style={styles.sectionTitle}>Tips for Healthy Ponds</Text>
-        {tips.map((tip, idx) => (
-          <View key={idx} style={styles.tipCard}>
-            <Text style={styles.tipTitle}>{tip.title}</Text>
-            <Text style={styles.tipMsg}>{tip.message}</Text>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.greeting}>Hey Ayoub!</Text>
+            <Text style={styles.welcome}>Welcome</Text>
           </View>
-        ))}
+          <TouchableOpacity style={styles.notificationBtn}>
+            <Ionicons name="notifications-outline" size={24} color={primary} />
+            <View style={styles.notificationDot} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Overview Cards */}
+        <View style={styles.overviewSection}>
+          <Text style={styles.sectionTitle}>Overview</Text>
+          <View style={styles.overviewCards}>
+            <View style={styles.overviewCard}>
+              <Text style={styles.overviewLabel}>Ponds</Text>
+              <Text style={styles.overviewValue}>+{stats.ponds_count}</Text>
+            </View>
+            <View style={styles.overviewCard}>
+              <Text style={styles.overviewLabel}>Region</Text>
+              <Text style={styles.overviewValue}>+{stats.regions_count}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Sensor Data Charts */}
+        <View style={styles.chartsSection}>
+          <Text style={styles.sectionTitle}>sensor data over time</Text>
+          {renderChart(stats.weekly_ph_do, '#3B82F6', 'Dissolved Oxygen', 'avgDO')}
+          {renderChart(stats.weekly_ph_do, '#10B981', 'Ph', 'avgPH')}
+          {renderChart(stats.weekly_ph_do, '#F59E0B', 'temperature', 'avgTemp')}
+        </View>
       </ScrollView>
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity style={[styles.navItem, styles.activeNavItem]}>
+          <Ionicons name="home" size={24} color={primary} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
+          <Ionicons name="water" size={24} color="#666" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
+          <Ionicons name="alert-circle" size={24} color="#666" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
+          <Ionicons name="document-text" size={24} color="#666" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
+          <Ionicons name="person" size={24} color="#666" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -84,134 +190,201 @@ export default function FishtaDashboard() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: '#F8F9FA',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: primary,
-    paddingTop: 48,
+    backgroundColor: cardBg,
+    paddingTop: 50,
     paddingBottom: 20,
-    paddingHorizontal: 24,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
     elevation: 4,
   },
-  logo: {
-    width: 48,
-    height: 48,
-    marginRight: 16,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-  },
-  title: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: 'bold',
-    letterSpacing: 1.5,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: primary,
-    marginBottom: 12,
-    marginTop: 18,
-  },
-  pondsRow: {
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 18,
-  },
-  pondCard: {
-    flex: 1,
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 4,
-    borderWidth: 2,
-    elevation: 2,
     alignItems: 'center',
   },
-  pondName: {
-    fontSize: 16,
+  greeting: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: textMain,
-    marginBottom: 6,
+    marginBottom: 4,
   },
-  statusRow: {
+  welcome: {
+    fontSize: 16,
+    color: textSecondary,
+  },
+  notificationBtn: {
+    position: 'relative',
+    padding: 8,
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: primary,
+  },
+  scrollView: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  overviewSection: {
+    marginTop: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: textMain,
+    marginBottom: 16,
+  },
+  overviewCards: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  overviewCard: {
+    flex: 1,
+    backgroundColor: cardBg,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  overviewLabel: {
+    fontSize: 14,
+    color: textSecondary,
+    marginBottom: 8,
+  },
+  overviewValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: textMain,
+  },
+  chartsSection: {
+    marginTop: 24,
+    marginBottom: 100,
+  },
+  chartCard: {
+    backgroundColor: cardBg,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  chartTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    gap: 8,
   },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 6,
-  },
-  pondStatus: {
-    fontSize: 14,
+  chartTitle: {
+    fontSize: 16,
     fontWeight: '600',
+    color: textMain,
   },
-  pondInfo: {
-    fontSize: 13,
+  currentValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  timeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  timeText: {
+    fontSize: 14,
     color: textSecondary,
-    marginBottom: 2,
   },
-  detailsBtn: {
-    marginTop: 8,
-    backgroundColor: primary,
-    borderRadius: 8,
-    paddingVertical: 6,
+  chartContainer: {
+    height: 120,
+  },
+  chartWithScale: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 80,
+  },
+  scaleContainer: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingRight: 10,
+    height: 80,
+  },
+  scaleValue: {
+    fontSize: 10,
+    color: textSecondary,
+  },
+  chartArea: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 80,
+    paddingHorizontal: 10,
+    flex: 1,
+  },
+  barContainer: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  bar: {
+    width: 20,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  dayLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  bottomNav: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: cardBg,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingBottom: 32,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  navItem: {
+    alignItems: 'center',
+    padding: 8,
+  },
+  activeNavItem: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
     paddingHorizontal: 16,
-  },
-  detailsBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 13,
-  },
-  alertCard: {
-    backgroundColor: '#FFF0EE',
-    borderLeftWidth: 5,
-    borderLeftColor: primary,
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 10,
-    elevation: 1,
-  },
-  alertTitle: {
-    color: primary,
-    fontWeight: 'bold',
-    fontSize: 15,
-    marginBottom: 2,
-  },
-  alertMsg: {
-    color: textMain,
-    fontSize: 13,
-  },
-  noAlerts: {
-    color: '#43B581',
-    fontSize: 15,
-    marginBottom: 10,
-  },
-  tipCard: {
-    backgroundColor: '#F7F7F7',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 10,
-    elevation: 1,
-  },
-  tipTitle: {
-    color: primary,
-    fontWeight: 'bold',
-    fontSize: 15,
-    marginBottom: 2,
-  },
-  tipMsg: {
-    color: textMain,
-    fontSize: 13,
   },
 });
