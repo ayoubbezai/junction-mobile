@@ -16,6 +16,7 @@ export default function TabLayout() {
       }}
     >
       <Stack.Screen name="welcome" />
+      <Stack.Screen name="ponds" />
       <Stack.Screen name="dashboard" />
     </Stack>
   );

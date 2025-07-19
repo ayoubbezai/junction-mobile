@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { statServices } from '../../services/statServices';
 
 const { width, height } = Dimensions.get('window');
@@ -67,8 +68,8 @@ export default function FishtaDashboard() {
     const currentValue = processedData.reduce((latest, item) => {
       return item[dataKey] > 0 ? item[dataKey] : latest;
     }, 0);
-    
-    return (
+
+  return (
       <View style={styles.chartCard}>
         <View style={styles.chartHeader}>
           <View style={styles.chartTitleRow}>
@@ -76,12 +77,12 @@ export default function FishtaDashboard() {
             <Text style={[styles.currentValue, { color: color }]}>
               {currentValue.toFixed(1)}
             </Text>
-          </View>
+    </View>
           <View style={styles.timeSelector}>
             <Text style={styles.timeText}>Weekly</Text>
             <Ionicons name="chevron-down" size={16} color="#666" />
           </View>
-        </View>
+      </View>
         <View style={styles.chartContainer}>
           <View style={styles.chartWithScale}>
             {/* Left Scale */}
@@ -132,13 +133,13 @@ export default function FishtaDashboard() {
           <View>
             <Text style={styles.greeting}>Hey Ayoub!</Text>
             <Text style={styles.welcome}>Welcome</Text>
-          </View>
+                    </View>
           <TouchableOpacity style={styles.notificationBtn}>
             <Ionicons name="notifications-outline" size={24} color={primary} />
             <View style={styles.notificationDot} />
           </TouchableOpacity>
-        </View>
-      </View>
+                    </View>
+                  </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Overview Cards */}
@@ -162,15 +163,18 @@ export default function FishtaDashboard() {
           {renderChart(stats.weekly_ph_do, '#3B82F6', 'Dissolved Oxygen', 'avgDO')}
           {renderChart(stats.weekly_ph_do, '#10B981', 'Ph', 'avgPH')}
           {renderChart(stats.weekly_ph_do, '#F59E0B', 'temperature', 'avgTemp')}
-        </View>
-      </ScrollView>
+            </View>
+          </ScrollView>
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
         <TouchableOpacity style={[styles.navItem, styles.activeNavItem]}>
           <Ionicons name="home" size={24} color={primary} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/(tabs)/ponds')}
+        >
           <Ionicons name="water" size={24} color="#666" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem}>
