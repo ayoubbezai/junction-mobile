@@ -177,14 +177,14 @@ export default function FishtaDashboard() {
         >
           <Ionicons name="water" size={24} color="#666" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/(tabs)/alerts')}
+        >
           <Ionicons name="alert-circle" size={24} color="#666" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem}>
           <Ionicons name="document-text" size={24} color="#666" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="person" size={24} color="#666" />
         </TouchableOpacity>
       </View>
     </View>
