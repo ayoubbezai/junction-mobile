@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { pondsServices } from '../../services/pondsServices';
 
 const { width } = Dimensions.get('window');
@@ -117,7 +117,16 @@ export default function PondsScreen() {
         >
           <Ionicons name="alert-circle" size={24} color="#666" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/(tabs)/tips')}
+        >
+          <Ionicons name="bulb" size={24} color="#666" />
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/(tabs)/pdfs')}
+        >
           <Ionicons name="document-text" size={24} color="#666" />
         </TouchableOpacity>
       </View>

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { alertsServices } from '../../services/alertsServices';
+import { tipsServices } from '../../services/tipsServices';
 
 const { width } = Dimensions.get('window');
 const primary = '#FB3026';
@@ -10,49 +10,32 @@ const cardBg = '#FFF';
 const textMain = '#1A1A1A';
 const textSecondary = '#666';
 
-export default function AlertsScreen() {
-    const [alerts, setAlerts] = useState([]);
+export default function TipsScreen() {
+    const [tips, setTips] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [expandedTips, setExpandedTips] = useState(new Set());
 
     useEffect(() => {
-        fetchAlerts();
+        fetchTips();
     }, []);
 
-    const fetchAlerts = async () => {
+    const fetchTips = async () => {
         try {
             setLoading(true);
-            const response = await alertsServices.getAlerts();
-            console.log("alerts response:", response?.data);
+            const response = await tipsServices.getTips();
+            console.log("tips response:", response?.data);
 
             if (response.success) {
-                setAlerts(response?.data);
+                setTips(response?.data);
             } else {
-                console.error('Failed to fetch alerts:', response.message);
-                setAlerts([]);
+                console.error('Failed to fetch tips:', response.message);
+                setTips([]);
             }
         } catch (error) {
-            console.error('Error fetching alerts:', error);
-            setAlerts([]);
+            console.error('Error fetching tips:', error);
+            setTips([]);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const getLevelColor = (level) => {
-        switch (level.toLowerCase()) {
-            case 'warning': return '#F59E0B';
-            case 'danger': return '#EF4444';
-            case 'info': return '#3B82F6';
-            default: return textSecondary;
-        }
-    };
-
-    const getLevelIcon = (level) => {
-        switch (level.toLowerCase()) {
-            case 'warning': return 'warning';
-            case 'danger': return 'alert-circle';
-            case 'info': return 'information-circle';
-            default: return 'notifications';
         }
     };
 
@@ -61,50 +44,83 @@ export default function AlertsScreen() {
         return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
+    const truncateMessage = (message, maxLength = 150) => {
+        if (message.length <= maxLength) return message;
+        return message.substring(0, maxLength) + '...';
+    };
+
+    const toggleTipExpansion = (tipId) => {
+        const newExpandedTips = new Set(expandedTips);
+        if (newExpandedTips.has(tipId)) {
+            newExpandedTips.delete(tipId);
+        } else {
+            newExpandedTips.add(tipId);
+        }
+        setExpandedTips(newExpandedTips);
+    };
+
+    const getDisplayMessage = (tip) => {
+        const isExpanded = expandedTips.has(tip.id);
+        if (isExpanded) {
+            return tip.message;
+        }
+        return truncateMessage(tip.message, 150);
+    };
+
     return (
         <View style={styles.root}>
             {/* Header */}
             <View style={styles.header}>
                 <View style={styles.headerContent}>
-                    <Text style={styles.title}>Alerts</Text>
+                    <Text style={styles.title}>Tips</Text>
                 </View>
             </View>
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                {/* Alerts List */}
-                {alerts && alerts.length > 0 && alerts.map((alert, index) => (
-                    <TouchableOpacity key={alert?.id} style={styles.alertCard}>
-                        <View style={styles.alertHeader}>
-                            <View style={styles.alertIconContainer}>
+                {/* Tips List */}
+                {tips && tips.length > 0 && tips.map((tip, index) => (
+                    <View key={tip?.id} style={styles.tipCard}>
+                        <View style={styles.tipHeader}>
+                            <View style={styles.tipIconContainer}>
                                 <Ionicons
-                                    name={getLevelIcon(alert.level)}
+                                    name="bulb"
                                     size={24}
-                                    color={getLevelColor(alert.level)}
+                                    color="#10B981"
                                 />
                             </View>
-                            <View style={styles.alertContent}>
-                                <Text style={styles.alertMessage}>{alert.message}</Text>
-                                <Text style={styles.alertTime}>{formatDate(alert.created_at)}</Text>
+                            <View style={styles.tipContent}>
+                                <Text style={styles.tipMessage}>{getDisplayMessage(tip)}</Text>
+                                <Text style={styles.tipTime}>{formatDate(tip.created_at)}</Text>
+                                {tip.message.length > 150 && (
+                                    <TouchableOpacity
+                                        style={styles.seeMoreButton}
+                                        onPress={() => toggleTipExpansion(tip.id)}
+                                    >
+                                        <Text style={styles.seeMoreText}>
+                                            {expandedTips.has(tip.id) ? 'See Less' : 'See More'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
-                            <View style={[styles.levelBadge, { backgroundColor: getLevelColor(alert.level) + '20' }]}>
-                                <Text style={[styles.levelText, { color: getLevelColor(alert.level) }]}>
-                                    {alert.level}
+                            <View style={styles.pondBadge}>
+                                <Text style={styles.pondText}>
+                                    Pond {tip.pond_id}
                                 </Text>
                             </View>
                         </View>
-                    </TouchableOpacity>
+                    </View>
                 ))}
 
-                {alerts.length === 0 && !loading && (
+                {tips.length === 0 && !loading && (
                     <View style={styles.emptyState}>
-                        <Ionicons name="notifications" size={48} color={textSecondary} />
-                        <Text style={styles.emptyText}>No alerts found</Text>
+                        <Ionicons name="bulb" size={48} color={textSecondary} />
+                        <Text style={styles.emptyText}>No tips found</Text>
                     </View>
                 )}
 
                 {loading && (
                     <View style={styles.loadingState}>
-                        <Text style={styles.loadingText}>Loading alerts...</Text>
+                        <Text style={styles.loadingText}>Loading tips...</Text>
                     </View>
                 )}
             </ScrollView>
@@ -123,14 +139,14 @@ export default function AlertsScreen() {
                 >
                     <Ionicons name="water" size={24} color="#666" />
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.navItem, styles.activeNavItem]}>
-                    <Ionicons name="alert-circle" size={24} color={primary} />
-                </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.navItem}
-                    onPress={() => router.push('/(tabs)/tips')}
+                    onPress={() => router.push('/(tabs)/alerts')}
                 >
-                    <Ionicons name="bulb" size={24} color="#666" />
+                    <Ionicons name="alert-circle" size={24} color="#666" />
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.navItem, styles.activeNavItem]}>
+                    <Ionicons name="bulb" size={24} color={primary} />
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.navItem}
@@ -175,7 +191,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 20,
     },
-    alertCard: {
+    tipCard: {
         backgroundColor: cardBg,
         borderRadius: 16,
         marginTop: 16,
@@ -188,41 +204,52 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 2,
     },
-    alertHeader: {
+    tipHeader: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-    alertIconContainer: {
+    tipIconContainer: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#FEF2F2',
+        backgroundColor: '#ECFDF5',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 16,
     },
-    alertContent: {
+    tipContent: {
         flex: 1,
     },
-    alertMessage: {
+    tipMessage: {
         fontSize: 16,
         fontWeight: '600',
         color: textMain,
         marginBottom: 4,
+        lineHeight: 22,
     },
-    alertTime: {
+    tipTime: {
         fontSize: 14,
         color: textSecondary,
     },
-    levelBadge: {
+    seeMoreButton: {
+        marginTop: 8,
+        paddingVertical: 4,
+    },
+    seeMoreText: {
+        fontSize: 14,
+        color: '#10B981',
+        fontWeight: '600',
+    },
+    pondBadge: {
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 12,
+        backgroundColor: '#E0F2FE',
     },
-    levelText: {
+    pondText: {
         fontSize: 12,
         fontWeight: 'bold',
-        textTransform: 'uppercase',
+        color: '#0284C7',
     },
     emptyState: {
         alignItems: 'center',

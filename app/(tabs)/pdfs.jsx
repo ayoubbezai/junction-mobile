@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { alertsServices } from '../../services/alertsServices';
+import { Dimensions, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { pdfsServices } from '../../services/pdfsServices';
 
 const { width } = Dimensions.get('window');
 const primary = '#FB3026';
@@ -10,55 +10,83 @@ const cardBg = '#FFF';
 const textMain = '#1A1A1A';
 const textSecondary = '#666';
 
-export default function AlertsScreen() {
-    const [alerts, setAlerts] = useState([]);
+export default function PdfsScreen() {
+    const [pdfs, setPdfs] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchAlerts();
+        fetchPdfs();
     }, []);
 
-    const fetchAlerts = async () => {
+    const fetchPdfs = async () => {
         try {
             setLoading(true);
-            const response = await alertsServices.getAlerts();
-            console.log("alerts response:", response?.data);
+            const response = await pdfsServices.getPdfs();
+            console.log("pdfs response:", response?.data);
 
             if (response.success) {
-                setAlerts(response?.data);
+                setPdfs(response?.data);
             } else {
-                console.error('Failed to fetch alerts:', response.message);
-                setAlerts([]);
+                console.error('Failed to fetch PDFs:', response.message);
+                setPdfs([]);
             }
         } catch (error) {
-            console.error('Error fetching alerts:', error);
-            setAlerts([]);
+            console.error('Error fetching PDFs:', error);
+            setPdfs([]);
         } finally {
             setLoading(false);
         }
     };
 
-    const getLevelColor = (level) => {
-        switch (level.toLowerCase()) {
-            case 'warning': return '#F59E0B';
-            case 'danger': return '#EF4444';
-            case 'info': return '#3B82F6';
-            default: return textSecondary;
-        }
+    const formatFileSize = (bytes) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
-    const getLevelIcon = (level) => {
-        switch (level.toLowerCase()) {
-            case 'warning': return 'warning';
-            case 'danger': return 'alert-circle';
-            case 'info': return 'information-circle';
-            default: return 'notifications';
-        }
-    };
-
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
+    const formatDate = (timestamp) => {
+        const date = new Date(timestamp * 1000);
         return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
+    const openPdf = async (url) => {
+        try {
+            await Linking.openURL(url);
+        } catch (error) {
+            console.error('Error opening PDF:', error);
+        }
+    };
+
+    const getFileIcon = (filename) => {
+        const extension = filename.split('.').pop().toLowerCase();
+        switch (extension) {
+            case 'pdf':
+                return 'document-text';
+            case 'txt':
+                return 'document';
+            case 'doc':
+            case 'docx':
+                return 'document-text';
+            default:
+                return 'document';
+        }
+    };
+
+    const getFileColor = (filename) => {
+        const extension = filename.split('.').pop().toLowerCase();
+        switch (extension) {
+            case 'pdf':
+                return '#EF4444';
+            case 'txt':
+                return '#6B7280';
+            case 'doc':
+            case 'docx':
+                return '#3B82F6';
+            default:
+                return '#6B7280';
+        }
     };
 
     return (
@@ -66,45 +94,49 @@ export default function AlertsScreen() {
             {/* Header */}
             <View style={styles.header}>
                 <View style={styles.headerContent}>
-                    <Text style={styles.title}>Alerts</Text>
+                    <Text style={styles.title}>Documents</Text>
                 </View>
             </View>
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                {/* Alerts List */}
-                {alerts && alerts.length > 0 && alerts.map((alert, index) => (
-                    <TouchableOpacity key={alert?.id} style={styles.alertCard}>
-                        <View style={styles.alertHeader}>
-                            <View style={styles.alertIconContainer}>
+                {/* PDFs List */}
+                {pdfs && pdfs.length > 0 && pdfs.map((pdf, index) => (
+                    <TouchableOpacity 
+                        key={pdf?.filename} 
+                        style={styles.pdfCard}
+                        onPress={() => openPdf(pdf.url)}
+                    >
+                        <View style={styles.pdfHeader}>
+                            <View style={styles.pdfIconContainer}>
                                 <Ionicons
-                                    name={getLevelIcon(alert.level)}
+                                    name={getFileIcon(pdf.filename)}
                                     size={24}
-                                    color={getLevelColor(alert.level)}
+                                    color={getFileColor(pdf.filename)}
                                 />
                             </View>
-                            <View style={styles.alertContent}>
-                                <Text style={styles.alertMessage}>{alert.message}</Text>
-                                <Text style={styles.alertTime}>{formatDate(alert.created_at)}</Text>
-                            </View>
-                            <View style={[styles.levelBadge, { backgroundColor: getLevelColor(alert.level) + '20' }]}>
-                                <Text style={[styles.levelText, { color: getLevelColor(alert.level) }]}>
-                                    {alert.level}
+                            <View style={styles.pdfContent}>
+                                <Text style={styles.pdfName}>{pdf.filename}</Text>
+                                <Text style={styles.pdfDetails}>
+                                    {formatFileSize(pdf.size)} • {formatDate(pdf.last_modified)}
                                 </Text>
+                            </View>
+                            <View style={styles.downloadBadge}>
+                                <Ionicons name="download" size={16} color="#10B981" />
                             </View>
                         </View>
                     </TouchableOpacity>
                 ))}
 
-                {alerts.length === 0 && !loading && (
+                {pdfs.length === 0 && !loading && (
                     <View style={styles.emptyState}>
-                        <Ionicons name="notifications" size={48} color={textSecondary} />
-                        <Text style={styles.emptyText}>No alerts found</Text>
+                        <Ionicons name="document-text" size={48} color={textSecondary} />
+                        <Text style={styles.emptyText}>No documents found</Text>
                     </View>
                 )}
 
                 {loading && (
                     <View style={styles.loadingState}>
-                        <Text style={styles.loadingText}>Loading alerts...</Text>
+                        <Text style={styles.loadingText}>Loading documents...</Text>
                     </View>
                 )}
             </ScrollView>
@@ -123,8 +155,11 @@ export default function AlertsScreen() {
                 >
                     <Ionicons name="water" size={24} color="#666" />
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.navItem, styles.activeNavItem]}>
-                    <Ionicons name="alert-circle" size={24} color={primary} />
+                <TouchableOpacity
+                    style={styles.navItem}
+                    onPress={() => router.push('/(tabs)/alerts')}
+                >
+                    <Ionicons name="alert-circle" size={24} color="#666" />
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.navItem}
@@ -132,11 +167,8 @@ export default function AlertsScreen() {
                 >
                     <Ionicons name="bulb" size={24} color="#666" />
                 </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.navItem}
-                    onPress={() => router.push('/(tabs)/pdfs')}
-                >
-                    <Ionicons name="document-text" size={24} color="#666" />
+                <TouchableOpacity style={[styles.navItem, styles.activeNavItem]}>
+                    <Ionicons name="document-text" size={24} color={primary} />
                 </TouchableOpacity>
             </View>
         </View>
@@ -175,7 +207,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 20,
     },
-    alertCard: {
+    pdfCard: {
         backgroundColor: cardBg,
         borderRadius: 16,
         marginTop: 16,
@@ -188,41 +220,36 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 2,
     },
-    alertHeader: {
+    pdfHeader: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-    alertIconContainer: {
+    pdfIconContainer: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#FEF2F2',
+        backgroundColor: '#F3F4F6',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 16,
     },
-    alertContent: {
+    pdfContent: {
         flex: 1,
     },
-    alertMessage: {
+    pdfName: {
         fontSize: 16,
         fontWeight: '600',
         color: textMain,
         marginBottom: 4,
     },
-    alertTime: {
+    pdfDetails: {
         fontSize: 14,
         color: textSecondary,
     },
-    levelBadge: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 12,
-    },
-    levelText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        textTransform: 'uppercase',
+    downloadBadge: {
+        padding: 8,
+        borderRadius: 8,
+        backgroundColor: '#ECFDF5',
     },
     emptyState: {
         alignItems: 'center',
